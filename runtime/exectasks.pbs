@@ -1,0 +1,161 @@
+#!/bin/bash
+#PBS -A bip149
+#PBS -e admd.err
+#PBS -o admd.out
+
+# APRUN_XFER_LIMITS=1 forwards the Open-files total `ulimit` to compute nodes:
+#  - required to let arbitrary numbers of workers
+#    connect to DB Host
+export APRUN_XFER_LIMITS=1
+export OMP_NUM_THREADS=16
+source ~/.bashrc
+echo "ADMD_ENV_ACTIVATE: $ADMD_ENV_ACTIVATE"
+echo "ADMD_HOSTNAME: $ADMD_HOSTNAME"
+echo "PBS_O_WORKDIR: $PBS_O_WORKDIR"
+
+if [ "$ADMD_HOSTNAME" = "rhea" ]
+then
+  LAUNCHER="mpirun"
+  NODEOPTS="-n "
+  MOREOPTS="-np 1 -map-by ppr:1:node:pe=$OMP_NUM_THREADS"
+  NETDEVICE="ib0"
+elif [ "$ADMD_HOSTNAME" = "titan" ]
+then
+  LAUNCHER="aprun"
+  NODEOPTS="-N 1 -n "
+  MOREOPTS="-d $OMP_NUM_THREADS"
+  NETDEVICE="ipogif0"
+fi
+
+cd $PBS_O_WORKDIR
+echo "Job in directory:"
+echo `pwd`
+ls -grth
+
+#####----------------------------------------------#####
+#---------------------------------------------#
+#  Job file used for instantiating the        #
+#  AdaptiveMDWorkers who will carry out       #
+#  our tasks.                                 #
+#                                             #
+#       1        2         3       4       5       6       7         8            9       10        11       12
+# roundnumber projname wkldtype ntraj mdsteps tjsteps aftrntjs anlyztjlength samplefunc minutes execflag jobstatefile
+#                                             #
+#---------------------------------------------#
+#####----------------------------------------------#####
+
+echo "GOT THESE ARGS: $@"
+DLM="*"
+echo "Splitting with \"$DLM\" character"
+ROUND_N=$(echo $1 | awk -F"$DLM" '{print $1}')
+PROJNAME=$(echo $1 | awk -F"$DLM" '{print $2}')
+#WKLOADTYPE=$(echo $1 | awk -F"*" '{print $3}')
+NTRAJ=$(echo $1 | awk -F"$DLM" '{print $4}')
+#MDSTEPS=$(echo $1 | awk -F"*" '{print $5}')
+#TJSTEPS=$(echo $1 | awk -F"*" '{print $6}')
+#AFTERNTRAJS=$(echo $1 | awk -F"*" '{print $7}')
+#MDLTJLENGTH=$(echo $1 | awk -F"*" '{print $8}')
+#SAMPLEFUNC=$(echo $1 | awk -F"*" '{print $9}')
+#MINUTES=$(echo $1 | awk -F"*" '{print $10}')
+ADMD_DB=$(echo $1 | awk -F"$DLM" '{print $11}')
+JOBSTATEFILE=$(echo $1 | awk -F"$DLM" '{print $12}')
+
+if [ ! -z "$JOBSTATEFILE" ]
+then
+  echo "R" > $JOBSTATEFILE
+fi
+
+NNODES=`cat $PBS_NODEFILE | tr ' ' '\n' | sort -u | wc -l`
+echo "NNODES: $NNODES"
+NWORKERS=$(($NNODES-1))
+#NNODES=$NTRAJ
+
+source $ADMD_ENV_ACTIVATE
+echo "PYTHON: `which python`"
+echo "pip: `which pip`"
+echo "packages:"
+echo `pip freeze`
+
+eval $OPENMM_PLATFORM
+
+export OPENMM_CUDA_COMPILER=`which nvcc`
+export OPENMM_CPU_THREADS=$OMP_NUM_THREADS
+
+echo "OPENMM_CUDA_COMPILER: $OPENMM_CUDA_COMPILER"
+echo "Using Project Name:  $PROJNAME"
+echo "Database Location: $ADMD_DB"
+echo "python: `which python`"
+echo "gcc: `which gcc`"
+
+ARGS=(`echo $@ | tr '*' ' '`)
+echo $ARGS
+echo ${ARGS[@]:0:9}
+
+#####----------------------------------------------#####
+###--           MongoDB Host Setup                 --###
+###--     - OLCF Titan: compute node host          --###
+#####----------------------------------------------#####
+echo "Database top:"
+ls -grth $ADMD_DB
+# Should only ever need default port number
+# when spinning up MongoDB on a compute node
+REMOTEPORT=27017
+mongolaunch="$LAUNCHER ${NODEOPTS}1 $MOREOPTS $ADMD_RUNTIME/startdb.sh $ADMD_DB $REMOTEPORT $NETDEVICE"
+echo $mongolaunch
+eval $mongolaunch 2> admd.startdb.err 1> admd.startdb.out & MONGO_APID=$!
+#aprun -n1 -N1 -d$OMP_NUM_THREADS $ADMD_RUNTIME/startdb.sh $ADMD_DB $REMOTEPORT 2> admd.startdb.err 1> admd.startdb.out & MONGO_APID=$!
+# Must wait for mongo node to write hostname and start up
+sleep 15
+REMOTEHOST=`cat $ADMD_DB/db.hostname`
+echo   "MongoDB Hostname for project '$PROJNAME': $REMOTEHOST"
+export ADMD_DBURL="mongodb://$REMOTEHOST:$REMOTEPORT/"
+##------------------------------------------------------#
+# echo "Setting up connection hop to database on Titan Login Node"
+# #REMOTEADDR=$(echo $ADMD_DBURL | awk -F "/" '{print $3}')
+# #REMOTEHOST=$(echo $REMOTEADDR | awk -F ":" '{print $1}')
+# #REMOTEPORT=$(echo $REMOTEADDR | awk -F ":" '{print $2}')
+# LOCALPORT=27017
+# LOCALURL=
+# #LOCALHOST=`ip addr show ipogif0 | grep -Eo '(addr:)?([0-9]*\.){3}[0-9]*'`
+# #LOCALURL='mongodb://$LOCALHOST:$LOCALPORT/'
+# echo "ssh -f $REMOTEHOST -L $REMOTEPORT:$REMOTEHOST:$LOCALPORT -N"
+# ssh -f $REMOTEHOST -L $REMOTEPORT:$REMOTEHOST:$LOCALPORT -N
+##------------------------------------------------------#
+
+#####----------------------------------------------#####
+###--     AdaptiveMD Application & Workers         --###
+###--  - OLCF Titan: application on service node   --###
+###--  - OLCF Titan: workers on compute nodes      --###
+#####----------------------------------------------#####
+admdappcommand="$ADMD_RUNTIME/application.sh ${ARGS[@]:0:10}"
+echo $admdappcommand
+eval $admdappcommand 1> admd.adaptivemd.launch.out 2> admd.adaptivemd.launch.err & EVENT_PID=$!
+sleep 15
+#------------------------------------------------------#
+admdworkerlaunch="$LAUNCHER $NODEOPTS$NWORKERS $MOREOPTS $ADMD_RUNTIME/startworker.sh $PROJNAME $ADMD_DBURL $NWORKERS"
+echo $admdworkerlaunch
+eval $admdworkerlaunch 2> admd.worker.launch.err 1> admd.worker.launch.out & WORKERS_APID=$!
+#------------------------------------------------------#
+
+#####----------------------------------------------#####
+###--           Finishing Up Now                   --###
+#####----------------------------------------------#####
+echo "Done launching workers, now waiting"
+echo "Waiting for event scripts to terminate"
+wait "$EVENT_PID"
+#echo "Waiting for workers to shut down"
+echo "Not waiting for workers to shut down"
+kill "$WORKERS_APID"
+wait "$WORKERS_APID"
+sleep 2
+echo "Going to shut down the database, event is finished"
+kill "$MONGO_APID"
+wait "$MONGO_APID"
+sleep 10
+rm $ADMD_DB/db.hostname
+deactivate
+wait
+if [ ! -z "$JOBSTATEFILE" ]
+then
+  echo "C" > $JOBSTATEFILE
+fi

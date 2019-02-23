@@ -1,0 +1,153 @@
+#!/usr/bin/env/ python
+
+
+from argparse import ArgumentParser
+
+#sleeptime = lambda arg: arg if arg == 'wait' else int(arg)
+stripped  = lambda arg: arg.strip() if arg else None
+anyall    = lambda arg: arg if arg in {'any','all'} else 'any'
+# Ts this exact same as using an int type?
+digit     = lambda arg: int(arg) if arg.isdigit() else TypeError
+pos_int   = lambda arg: int(arg) if (
+        int(arg) > 0 and arg.find('.') < 0) else ValueError
+
+def argparser():
+
+    parser = ArgumentParser(description="Create admd jobs")
+
+    parser.add_argument("project_name",
+        help="Name of project", type=stripped)
+
+    parser.add_argument("--reinit", dest="reinitialize",
+        help="Delete project if exists to reinitialize",
+        action='store_true')
+
+    parser.add_argument("system_name", nargs="?",
+        help="Name of system", type=stripped)
+
+    parser.add_argument("--init_only",
+        help="Only initialize project",
+        action="store_true")
+
+    parser.add_argument("-N","--n-trajectory", dest="n_traj",
+        help="Number of trajectories to create",
+        type=int, default=16)
+
+    parser.add_argument("-M","--modeller",
+        help="Create a model each iteration", type=stripped)
+
+    parser.add_argument("--rp", action="store_true",
+        help="Use RP" )
+
+    parser.add_argument("-x","--n-extension", dest="n_ext",
+        help="Number of extensions to trajectories",
+        type=int, default=1)
+
+    parser.add_argument("--longts", dest="longts",
+        help="Flag for 5fs timesteps",
+        action='store_true')
+
+    parser.add_argument("-l","--length",
+        help="Length of trajectory segments in frames",
+        type=int, default=100)
+
+    parser.add_argument("-b","--n_rounds",
+        help="Number of task rounds inside a single PBS job",
+        type=int, default=0)
+
+    parser.add_argument("-t","--threads",
+        help="Number of threads per task",
+        type=int, default=1)
+
+    parser.add_argument("-c","--batchsize",
+        help="Number of tasks to queue simultaneously",
+        type=int, default=999999)
+
+    parser.add_argument("-u","--batchwait",
+        help="How to wait on queued batches of tasks, \"any\" or \"all\" if given",
+        default=False, type=anyall)
+
+    parser.add_argument("--progression",
+        help="Workflow task-completion progression criteria",
+        default="any", type=anyall)
+
+    parser.add_argument("-s","--batchsleep",
+        help="Time to sleep between task batches",
+        type=int, default=5)
+
+    parser.add_argument("-R","--round_n",
+        help="Use if you are externally tracking round number",
+        type=int, default=1)
+
+    parser.add_argument("-e","--environment",
+        help="Conda Environment name for running tasks", type=stripped)
+
+    parser.add_argument("-w","--virtualenv",
+        help="Virtualenv environment activate path for running tasks", type=stripped)
+
+    parser.add_argument("-A","--activate_prefix",
+        help="Activate script path", type=stripped)
+
+    parser.add_argument("-a","--after_n_trajs",
+        help="Extension of trajs N onward", type=digit)
+
+    parser.add_argument("-k","--minlength",
+        help="Minimum trajectory total length in frames",
+        type=int, default=100)
+
+    # TODO the default behavior doesn't carry through, and should
+    #      be set to fixed and changed to false. investigate this...
+    parser.add_argument("-f","--fixedlength",
+        help="Default randomizes traj length, flag to fix to n_steps",
+        action='store_true')
+
+    parser.add_argument("-p","--protein-stride", dest="prot",
+        help="Stride between saved protein structure frames",
+        type=int, default=2)
+
+    parser.add_argument("-m","--master-stride", dest="all",
+        help="Stride between saved frames with all atoms",
+        type=int, default=10)
+
+    parser.add_argument("-P","--platform",
+        help="Simulation Platform: Reference, CPU, CUDA, or OpenCL",
+        default="CPU", type=stripped)
+
+    parser.add_argument("--dburl",
+        help="Full URL of the MongoDB",
+        default="mongodb://localhost:27017/", type=stripped)
+
+    parser.add_argument("-r","--strategy",
+        help="Filename of strategy script to run for generating tasks",
+        default="run_admd.py", type=stripped)
+
+    parser.add_argument("-S","--sampling_method",
+        help="Name of sampling function saved in sampling_functions.py",
+        default="explore_macrostates", type=stripped)
+
+    parser.add_argument("-i","--template", dest="template",
+        help="Input job template file, ie admd_workers.pbs",
+        default="run_admdrp.sh", type=stripped)
+
+    parser.add_argument("--min_model_trajlength",
+        help="Minimum length for trajectories to analyze",
+        default=0, type=digit)
+
+    parser.add_argument("--minutes",
+        help="Number of minutes to request for LRMS job",
+        type=pos_int, default=0)
+
+    parser.add_argument("--submit_only",
+        help="Submit a workload and immediately quit AdaptiveMD Application",
+        action="store_true")
+
+    parser.add_argument("--rescue_tasks",
+        help="Skip workload if failed or incomplete tasks detected",
+        action="store_true",)
+        
+
+    parser.add_argument("--rescue_only",
+        help="Quit runtime after rescue check",
+        action="store_true")
+
+    return parser
