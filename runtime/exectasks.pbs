@@ -44,8 +44,15 @@ ls -grth
 #---------------------------------------------#
 #####----------------------------------------------#####
 
-echo "GOT THESE ARGS: $@"
-DLM="*"
+#echo "GOT THESE ARGS: $@"
+#DLM="*"
+
+ARGSFILE="qsub.stdin"
+ARGSIN=$(cat $ARGSFILE)
+echo "GOT THESE ARGS: $ARGSIN"
+DLM=" "
+rm $ARGSFILE
+
 echo "Splitting with \"$DLM\" character"
 ROUND_N=$(echo $1 | awk -F"$DLM" '{print $1}')
 PROJNAME=$(echo $1 | awk -F"$DLM" '{print $2}')

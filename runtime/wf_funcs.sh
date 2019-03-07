@@ -95,9 +95,9 @@ function rescue_tasks {
   else
     JOBSTATEFILE=""
   fi
-  #submitcommand="qsub $TARGETQ -N $2.$1.$WKLTYPE.admd -l nodes=$NNODES -l walltime=0:${10}:0 -F $1*$2*cleanup*$4*$5*$6*$7*$8*$9*${10}*$DBHOME*$JOBSTATEFILE $ADMD_RUNTIME/exectasks.pbs"
-  #submitcommand="qsub         -N $4.$3.rescue.admd -l nodes=$NNODES -l walltime=0:${12}:0 -F $3*$4*cleanup*$6*$7*$8*$9*${10}*${11}*${12}*$DBHOME*$JOBSTATEFILE $ADMD_RUNTIME/exectasks.pbs"
-  submitcommand="qsub $TARGETQ -N $4.$3.rescue.admd -l nodes=$NNODES -l walltime=0:${12}:0 -F $3*$4*cleanup*$6*$7*$8*$9*${10}*${11}*${12}*$DBHOME*$JOBSTATEFILE $ADMD_RUNTIME/exectasks.pbs"
+  #submitcommand="qsub $TARGETQ -N $4.$3.rescue.admd -l nodes=$NNODES -l walltime=0:${12}:0 -F $3*$4*cleanup*$6*$7*$8*$9*${10}*${11}*${12}*$DBHOME*$JOBSTATEFILE $ADMD_RUNTIME/exectasks.pbs"
+  echo -e "$3\n$4\ncleanup\n$6\n$7\n$8\n$9\n${10}\n${11}\n${12}\n$DBHOME\n$JOBSTATEFILE" > qsub.stdin
+  submitcommand="qsub $TARGETQ -N $4.$3.rescue.admd -l nodes=$NNODES -l walltime=0:${12}:0 $ADMD_RUNTIME/exectasks.pbs"
   echo $submitcommand
   ADMD_JOBID=$(eval $submitcommand)
   echo "Initiated AdaptiveMD workload in PBS job# $ADMD_JOBID"
@@ -257,7 +257,9 @@ function exec_workload {
           JOBSTATEFILE=""
         fi
 
-        submitcommand="qsub $TARGETQ -N $2.$1.$WKLTYPE.admd -l nodes=$NNODES -l walltime=0:${10}:0 -F $1*$2*cleanup*$4*$5*$6*$7*$8*$9*${10}*$DBHOME*$JOBSTATEFILE $ADMD_RUNTIME/exectasks.pbs"
+        #submitcommand="qsub $TARGETQ -N $2.$1.$WKLTYPE.admd -l nodes=$NNODES -l walltime=0:${10}:0 -F $1*$2*cleanup*$4*$5*$6*$7*$8*$9*${10}*$DBHOME*$JOBSTATEFILE $ADMD_RUNTIME/exectasks.pbs"
+        echo -e "$1\n$2\ncleanup\n$4\n$5\n$6\n$7\n$8\n$9\n${10}\n$DBHOME\n$JOBSTATEFILE" > qsub.stdin
+        submitcommand="qsub $TARGETQ -N $2.$1.$WKLTYPE.admd -l nodes=$NNODES -l walltime=0:${10}:0 $ADMD_RUNTIME/exectasks.pbs"
         echo $submitcommand
         ADMD_JOBID=$(eval $submitcommand)
         # TODO add check of submission (maybe just if [ -z $ADMD_JOBID ])
