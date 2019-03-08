@@ -2,6 +2,8 @@
 #PBS -e admd.err
 #PBS -o admd.out
 
+###  PBS -A bip149
+
 # APRUN_XFER_LIMITS=1 forwards the Open-files total `ulimit` to compute nodes:
 #  - required to let arbitrary numbers of workers
 #    connect to DB Host
