@@ -1,5 +1,4 @@
 #!/bin/bash
-#PBS -A bip149
 #PBS -e admd.err
 #PBS -o admd.out
 
