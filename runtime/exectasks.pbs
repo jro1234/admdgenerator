@@ -2,8 +2,6 @@
 #PBS -e admd.err
 #PBS -o admd.out
 
-###  PBS -A bip149
-
 # APRUN_XFER_LIMITS=1 forwards the Open-files total `ulimit` to compute nodes:
 #  - required to let arbitrary numbers of workers
 #    connect to DB Host
@@ -11,6 +9,8 @@ export APRUN_XFER_LIMITS=1
 export OMP_NUM_THREADS=16
 source ~/.bashrc
 echo "ADMD_ENV_ACTIVATE: $ADMD_ENV_ACTIVATE"
+echo "ADMD_HOSTNAME: $ADMD_HOSTNAME"
+export ADMD_HOSTNAME='bwsvc'
 echo "ADMD_HOSTNAME: $ADMD_HOSTNAME"
 echo "PBS_O_WORKDIR: $PBS_O_WORKDIR"
 
@@ -20,6 +20,12 @@ then
   NODEOPTS="-n "
   MOREOPTS="-np 1 -map-by ppr:1:node:pe=$OMP_NUM_THREADS"
   NETDEVICE="ib0"
+elif [ "$ADMD_HOSTNAME" = "bwsvc" ]
+then
+  LAUNCHER="aprun"
+  NODEOPTS="-N 1 -n "
+  MOREOPTS="-d $OMP_NUM_THREADS"
+  NETDEVICE="ipogif0"
 elif [ "$ADMD_HOSTNAME" = "titan" ]
 then
   LAUNCHER="aprun"
