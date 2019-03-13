@@ -97,7 +97,7 @@ function rescue_tasks {
   fi
   #submitcommand="qsub $TARGETQ -N $4.$3.rescue.admd -l nodes=$NNODES -l walltime=0:${12}:0 -F $3*$4*cleanup*$6*$7*$8*$9*${10}*${11}*${12}*$DBHOME*$JOBSTATEFILE $ADMD_RUNTIME/exectasks.pbs"
   echo -e "$3\n$4\ncleanup\n$6\n$7\n$8\n$9\n${10}\n${11}\n${12}\n$DBHOME\n$JOBSTATEFILE" > qsub.stdin
-  submitcommand="qsub $TARGETQ -N $4.$3.rescue.admd -l nodes=$NNODES -l walltime=0:${12}:0 $ADMD_RUNTIME/exectasks.pbs"
+  submitcommand="qsub $TARGETQ -N $4.$3.rescue.admd -l nodes=$NNODES:ppn=16:xk -l walltime=0:${12}:0 $ADMD_RUNTIME/exectasks.pbs"
   echo $submitcommand
   ADMD_JOBID=$(eval $submitcommand)
   echo "Initiated AdaptiveMD workload in PBS job# $ADMD_JOBID"
